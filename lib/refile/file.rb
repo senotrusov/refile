@@ -106,7 +106,7 @@ module Refile
       unless @io
         cache_key = ::Refile.backend_cache_path / @id
         if ::File.exist?(cache_key)
-          if Rails.env.production? and defined?(Redis)
+          if (Rails.env.production? || Rails.env.staging?) && defined?(Redis)
             Redis.new.incrby("Refile.backend_cache.total_hit", (::File.size(cache_key) rescue 0)) rescue nil
           end
           @io = ::File.open(cache_key, 'r') rescue backend.open(id)
