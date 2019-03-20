@@ -117,8 +117,8 @@ module Refile
 
         if @io.is_a?(Tempfile) && @io.respond_to?(:stat) && @io.stat.size > 0
           begin
-            storage_path = if File.symlink?(::Refile.backend_cache_path)
-              File.readlink(::Refile.backend_cache_path)
+            storage_path = if ::File.symlink?(::Refile.backend_cache_path)
+              ::File.readlink(::Refile.backend_cache_path)
             else
               ::Refile.backend_cache_path.to_s
             end
