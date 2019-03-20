@@ -1,5 +1,3 @@
-require "redis"
-
 module Refile
   class File
     # @return [Backend] the backend the file is stored in
@@ -40,12 +38,14 @@ module Refile
 
     # @return [Integer] the size of the file in bytes
     def size
-      cache_key = ::Refile.backend_cache_path / @id
-      if ::File.exist?(cache_key)
-        ::File.size(cache_key) rescue backend.size(id)
-      else
-        backend.size(id)
+      begin
+        cache_key = ::Refile.backend_cache_path / @id
+        if ::File.exist?(cache_key)
+          return ::File.size(cache_key)
+        end
+      rescue SystemCallError
       end
+      backend.size(id)
     end
 
     # Remove the file from the backend.
@@ -75,6 +75,7 @@ module Refile
     # @return [Tempfile] a tempfile with the file's content
     def download
       return io if io.is_a?(Tempfile)
+      return io if io.is_a?(::File)
 
       Tempfile.new(id, binmode: true).tap do |tempfile|
         IO.copy_stream(io, tempfile)
@@ -106,14 +107,18 @@ module Refile
       unless @io
         cache_key = ::Refile.backend_cache_path / @id
         if ::File.exist?(cache_key)
-          if (Rails.env.production? || Rails.env.staging?) && defined?(Redis)
-            Redis.new.incrby("Refile.backend_cache.total_hit", (::File.size(cache_key) rescue 0)) rescue nil
+          begin
+            return @io = ::File.open(cache_key, 'r')
+          rescue SystemCallError
           end
-          @io = ::File.open(cache_key, 'r') rescue backend.open(id)
-        else
-          @io = backend.open(id)
-          if @io.is_a?(Tempfile) && @io.respond_to?(:stat) && @io.stat.size > 0
-            ::FileUtils.cp(@io.path, cache_key)
+        end
+        @io = backend.open(id)
+
+        if @io.is_a?(Tempfile) && @io.respond_to?(:stat) && @io.stat.size > 0
+          begin
+            ::FileUtils.cp(@io.path, "#{cache_key}.tmp")
+            ::FileUtils.mv("#{cache_key}.tmp", cache_key)
+          rescue SystemCallError
           end
         end
       end
