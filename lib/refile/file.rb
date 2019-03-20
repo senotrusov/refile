@@ -1,3 +1,5 @@
+require 'sys/filesystem'
+
 module Refile
   class File
     # @return [Backend] the backend the file is stored in
@@ -115,8 +117,11 @@ module Refile
 
         if @io.is_a?(Tempfile) && @io.respond_to?(:stat) && @io.stat.size > 0
           begin
-            ::FileUtils.cp(@io.path, "#{cache_key}.tmp")
-            ::FileUtils.mv("#{cache_key}.tmp", cache_key)
+            fs_stat = Sys::Filesystem.stat('.')
+            if fs_stat.blocks_available > (fs_stat.blocks * 0.05)
+              ::FileUtils.cp(@io.path, "#{cache_key}.tmp")
+              ::FileUtils.mv("#{cache_key}.tmp", cache_key)
+            end
           rescue SystemCallError
           end
         end
