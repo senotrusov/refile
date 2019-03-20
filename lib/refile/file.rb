@@ -117,7 +117,12 @@ module Refile
 
         if @io.is_a?(Tempfile) && @io.respond_to?(:stat) && @io.stat.size > 0
           begin
-            fs_stat = Sys::Filesystem.stat('.')
+            storage_path = if File.symlink?(::Refile.backend_cache_path)
+              File.readlink(::Refile.backend_cache_path)
+            else
+              ::Refile.backend_cache_path.to_s
+            end
+            fs_stat = Sys::Filesystem.stat(storage_path)
             if fs_stat.blocks_available > (fs_stat.blocks * 0.05)
               ::FileUtils.cp(@io.path, "#{cache_key}.tmp")
               ::FileUtils.mv("#{cache_key}.tmp", cache_key)
