@@ -130,6 +130,7 @@ module Refile
           rescue SystemCallError
           end
         end
+
       end
       @io
     end
