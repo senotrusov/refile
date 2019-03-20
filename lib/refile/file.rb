@@ -75,7 +75,6 @@ module Refile
     # @return [Tempfile] a tempfile with the file's content
     def download
       return io if io.is_a?(Tempfile)
-      return io if io.is_a?(::File)
 
       Tempfile.new(id, binmode: true).tap do |tempfile|
         IO.copy_stream(io, tempfile)
