@@ -128,7 +128,10 @@
             return data;
           });
           if(!input.multiple) dataObj = dataObj[0];
-          if(metadataField) metadataField.value = JSON.stringify(dataObj);
+          if(metadataField) {
+            metadataField.value = JSON.stringify(dataObj);
+            metadataField.removeAttribute('disabled');
+          };
 
           input.removeAttribute("name");
         }

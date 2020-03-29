@@ -25,6 +25,7 @@ Features:
 - Works across form redisplays, i.e. when validations fail, even on S3
 - Effortless direct uploads, even to S3
 - Support for multiple file uploads
+- Support for single file upload
 
 Sponsored by:
 
@@ -61,7 +62,7 @@ Generate a migration:
 
 ``` sh
 rails generate migration add_profile_image_to_users profile_image_id:string &&
-profile_image_filename:string && profile_image_content_size:string &&
+profile_image_filename:string && profile_image_size:string &&
 profile_image_content_type:string
 
 rake db:migrate
@@ -781,6 +782,125 @@ so that older attachments are kept. To enable this, set the `append` option to
 class Post < ActiveRecord::Base
   has_many :images, dependent: :destroy
   accepts_attachments_for :images, append: true
+end
+```
+### Multiple file uploads for pure Ruby classes
+
+You can also use `accepts_attachments_for` macro in pure Ruby classes.
+
+Suppose you have a `Document` class to be associated with a `Post` class.
+A post has many documents, and each document has a file.
+First, you will need to use the `attachment` macro in the `Document` class to
+declare your `:file` attachment, and also implement a constructor to receive
+the attachment:
+
+```ruby
+class Document
+  extend Refile::Attachment
+  attr_accessor :file_id
+
+  attachment :file
+
+  def initialize(attributes = {})
+    self.file = attributes[:file]
+  end
+end
+```
+
+In the `Post` class, you will need a constructor to initialize the `@documents`
+variable and an `attr_accessor :documents`. Then you can use the `accepts_attachments_for`
+macro for declaring the `:documents` collection:
+
+```ruby
+class Post
+  extend Refile::Attachment
+  include ActiveModel::Model
+
+  attr_accessor :documents
+
+  accepts_attachments_for(
+    :documents,
+    accessor_prefix: 'documents_files',
+    collection_class: Document
+  )
+
+  def initialize(attributes = {})
+    @documents = attributes[:documents] || []
+  end
+end
+```
+
+In this example, we specified the following options:
+
+- `collection_class` is the attachments class, `Document`
+- `accessor_prefix` gives a prefix to the generated accessors, `documents_files`.
+
+Now you can append attachments with your HTML form in the following way:
+
+```erb
+<%= form_for @post do |form| %>
+  <%= form.label :documents_files %>
+  <%= form.attachment_field :documents_files, multiple: true %>
+<% end %>
+```
+
+The default values for the `accepts_attachments_for` macro are
+`{ attachment: :file, append: false }`. Everything else should be similar to
+the Active Record version of this macro.
+
+## Single file upload
+
+File input fields support single file upload, allows users to attach
+one file at the time instead of the common multiple files feature.
+Let's suppose you have an image model like this:
+
+``` ruby
+class Image < ActiveRecord::Base
+  belongs_to :post
+  attachment :file
+end
+```
+
+Note it must be possible to persist images given only the associated post and a
+file. There must not be any other validations or constraints which prevent
+images from being saved.
+
+From the post model, you can use the `accepts_attachments_for` macro:
+
+``` ruby
+class Post < ActiveRecord::Base
+  has_many :images, dependent: :destroy
+  accepts_attachments_for :images, attachment: :file
+end
+```
+
+The `attachment` option defaults to `:file`, so we could have left it out in
+this case.
+
+``` ruby
+class Post < ActiveRecord::Base
+  has_many :images, dependent: :destroy
+  accepts_attachments_for :images
+end
+```
+
+You can add the attachment field to your post form without using the `multiple`
+attribute:
+
+``` erb
+<%= form_for @post do |form| %>
+  <%= form.label :images_files %>
+  <%= form.attachment_field :images_files %>
+<% end %>
+```
+
+Now you only need to permit the generated accessor in your controller.  Since
+`images_files` is not an array, you need to tell Rails to only allow the
+attribute symbol:
+
+``` ruby
+def post_params
+  params.require(:post).permit(:images_files)
 end
 ```
 
